@@ -1,0 +1,7 @@
+[docker_server]
+5.172.195.177 ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_user=ec2-user
+
+
+#[lancom:vars]
+#ansible_ssh_private_key_file=~/.ssh/id_rsa
+#ansible_user=root

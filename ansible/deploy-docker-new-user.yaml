@@ -1,0 +1,85 @@
+---
+
+- name: Wait for ssh connection
+  hosts: all
+  gather_facts: Flase
+  tasks:
+    - name: Ensure ssh port open
+      wait_for:
+        port: 22
+        delay: 10
+        timeout: 100
+        search_regex: OpenSSH
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+      vars:
+        ansible_connection: local
+        ansible_python_interpreter: /usr/bin/python
+
+- name: Install python3, docker, docker-compose
+  hosts: all
+  become: yes
+  gather_facts: False
+  tasks:
+    - name: Install python3, docker, docker-compose
+      vars:
+        ansible_python_interpreter: /usr/bin/python
+      yum:
+        name:
+          - python3
+          - docker
+        update_cache: yes
+        state: present
+    - name: Install docker-compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/1.27.4/docker-compose-Linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: +x
+    - name: Start docker daemon
+      systemd:
+        name: docker
+        state: started
+    - name: Install docker python module
+      pip:
+        name:
+          - docker
+          - docker-compose
+
+- name: Create new linux user
+  hosts: all
+  become: yes
+  tasks:
+    - name: Create new linux user
+      user:
+        name: tilemachos
+        groups: adm,docker
+
+- name: Start docker containers
+  hosts: all
+  become: yes
+  become_user: tilemachos
+  vars_prompt:
+    - name: docker_password
+      prompt: Enter password for docker registry
+  tasks:
+    - name: Copy docker compose
+      copy:
+        src: /home/tilemachos/devops-courses/ansible/docker-compose.yaml
+        dest: /home/tilemachos/docker-compose.yaml
+    - name: Docker login
+      docker_login:
+        registry_url: https://index.docker.io/v1/
+        username: dmaildocker
+        password: "{{docker_password}}"
+    - name: Start container from compose
+      docker_compose:
+      project_src: /home/tilemachos
+      state: present
+#the state: present is the default state for this command. it gonna run docker-compose up even without "state: present"
+
+#- name: Test docker pull
+#  hosts: docker_server
+#  tasks:
+#    - name: Redis pull
+#      docker_image:
+#        name: redis
+#        source: pull
